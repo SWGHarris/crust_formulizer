@@ -31,7 +31,7 @@ struct DoughSegment {
 #[derive(Debug)]
 struct Formula {
     name: String,
-    dough_segments: HashMap<String, DoughSegment>
+    segments: HashMap<String, DoughSegment>
 }
 
 fn main() {
@@ -55,27 +55,20 @@ fn main() {
         ";
 
     let docs = YamlLoader::load_from_str(s).unwrap();
-
-    // Multi document support, doc is a yaml::Yaml
     let doc = &docs[0];
     let formula_name = doc["name"].as_str().unwrap().to_string();
-    let mut formula: Formula = Formula {name: formula_name, dough_segments: HashMap::new()};
+    let mut formula: Formula = Formula {name: formula_name, segments: HashMap::new()};
     for (i, s) in doc["segments"].as_vec().unwrap().iter().enumerate() {
         let name = s["name"].as_str().unwrap().to_string();
-        let mut segment: DoughSegment = DoughSegment {name: name, order: i as u32, ingredients: Vec::new()};
+        let mut segment: DoughSegment = DoughSegment {name: name.clone(), order: i as u32, ingredients: Vec::new()};
         for ing in s["ingredients"].as_vec().unwrap() {
             let name     = ing[0].as_str().unwrap().to_string();
             let mass     = ing[1].as_f64().unwrap();
             let is_flour = ing[2].as_bool().unwrap();
             segment.ingredients.push(Ingredient(name, mass, is_flour));
         }
-        println!("{:?}", segment);
+        formula.segments.insert(name, segment);
     }
 
-    //let mut out_str = String::new();
-    // {
-    //    let mut emitter = YamlEmitter::new(&mut out_str);
-    //    emitter.dump(doc).unwrap(); // dump the YAML object to a String
-    // }
-    // println!("{}", out_str);    
+    println!("{:#?}", formula);
 }
