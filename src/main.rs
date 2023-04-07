@@ -1,5 +1,6 @@
 extern crate yaml_rust;
 use std::collections::HashMap;
+use std::fs;
 use yaml_rust::{YamlLoader, YamlEmitter};
 
 // ideas
@@ -35,26 +36,8 @@ struct Formula {
 }
 
 fn main() {
-    let s =
-        "
-        name: bread title
-        segments:
-            -
-                name: poolish
-                ingredients:
-                    - [all purpose flour, 100.0, true]
-                    - [water,             100.0, false]
-                    - [yeast,               1.0, false]
-            - 
-                name: mix
-                ingredients:
-                    - [all purpose flour, 50.0, true]
-                    - [whole wheat flour, 50.0, true]
-                    - [water,             80.0, false]
-                    - [poolish,           10.0, false]
-        ";
-
-    let docs = YamlLoader::load_from_str(s).unwrap();
+    let s = fs::read_to_string("./test.yaml").expect("Unable to read file");
+    let docs = YamlLoader::load_from_str(&s).unwrap();
     let doc = &docs[0];
     let formula_name = doc["name"].as_str().unwrap().to_string();
     let mut formula: Formula = Formula {name: formula_name, segments: HashMap::new()};

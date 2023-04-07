@@ -1,0 +1,15 @@
+name: bread title
+segments:
+  -
+    name: poolish
+    ingredients:
+      - [all purpose flour, 100.0, true]
+      - [water,             100.0, false]
+      - [yeast,               1.0, false]
+  -
+    name: mix
+    ingredients:
+      - [all purpose flour, 50.0, true]
+      - [whole wheat flour, 50.0, true]
+      - [water,             80.0, false]
+      - [poolish,           10.0, false]
