@@ -13,27 +13,7 @@ use std::fs;
 fn main() {
     // read in data
     let filename: String = fs::read_to_string("./test.yaml").expect("Unable to read file");
-
-    // convert yaml to structs
     let formula: DoughFormula = dough::yaml_to_dough_formula(filename);
-    println!("{:?}", formula);
-//    ingredients.insert(0, String::from("ingredient")); 
-//    cols.insert(0, ingredients.clone());
-//
-//    for (j, col) in cols.enumerate() {
-//        if j % 2 == 0 && j != 0 {
-//            let mut mass_col: Vec<String> = Vec::with_capacity(ingredients.len() + 4);
-//            mass_col.append(&mut Vec::from([String::from(""), String::from("grams")]));
-//            for (i, cell) in col.enumerate() {
-//                let mut func: String = String::from("=");
-//                func.push(&to_cell(i, j - 1, false));
-//                func.push(&String::from("/"));
-//                func.push(&to_cell(ingredients.len() + 2, j - 1, true));
-//                func.push(&String::from("*"));
-//
-//            }
-//        }
-//    }
-//
+    println!("{:#?}", formula);
 
 }

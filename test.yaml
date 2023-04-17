@@ -1,8 +1,7 @@
 name: bread title
-by_percent: false     # put true only if using percentages
 dough_serving: 500.0  # recommended dough size
 batch_size: 2         # recommended batch size
-segments:
+components:
   -
     name: poolish
     ingredients:

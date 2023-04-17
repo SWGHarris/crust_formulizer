@@ -1,5 +1,6 @@
 use core::fmt;
 use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 
 #[derive(Debug)]
 pub struct CSVCell {
@@ -17,7 +18,7 @@ impl CSVCell {
 }
 
 #[derive(Debug)]
-struct CellPosition {
+pub struct CellPosition {
     row: u32,
     col: u32,
     fix_row: bool,
@@ -38,35 +39,25 @@ impl fmt::Display for CellPosition {
 
 // dim refers to the direction of the array.
 #[derive(Debug)]
-struct CellArray {
+pub struct CellArray {
     from: CellPosition,
     to: CellPosition,
-    dim: CellArrayDim
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum CellArrayDim {
-    Row,
-    Col
+    // dim: CellArrayDim
 }
 
 impl CellArray {
-    fn new(from: CellPosition, to: CellPosition, dim: CellArrayDim) -> Self {
-        if from.col != to.col && dim == CellArrayDim::Col 
-            || from.row != to.row && dim == CellArrayDim::Row {
-            panic!("CellArray: from/to must have same {:#?} values", dim);
+    pub fn new(from: CellPosition, to: CellPosition) -> Self {
+        if from.col != to.col && from.row != to.row {
+            panic!("CellArray: either 'from' or 'to' must have same value");
         }
-        CellArray { from, to, dim}
+        CellArray { from, to }
     }
 
-    fn len(&self) -> u32 {
-        match self.dim {
-            CellArrayDim::Row => {
-                self.to.row - self.from.row + 1
-            },
-            CellArrayDim::Col => {
-                self.to.col - self.from.col + 1
-            }
+    pub fn len(&self) -> u32 {
+        if self.from.col != self.to.col {
+            self.to.col - self.from.col + 1
+        } else {
+            self.to.row - self.from.row + 1
         }
     }
 }
@@ -81,8 +72,9 @@ impl fmt::Display for CellArray {
     }
 }
 
+
 #[derive(Debug)]
-enum CellValue {
+pub enum CellValue {
     Str(String),
     Expr(CellExpr),
     Empty
@@ -104,8 +96,8 @@ impl fmt::Display for CellValue {
 }
 
 #[derive(Debug)]
-enum CellExpr {
-    Binop(Op, Box<CellExpr>, Box<CellExpr>),
+pub enum CellExpr {
+    BinaryOp(BinOp, Box<CellExpr>, Box<CellExpr>),
     CellRef(CellPosition),
     Sum(CellArray),
     SumProduct(CellArray, CellArray),
@@ -117,10 +109,12 @@ impl fmt::Display for CellExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut res = String::from("");
         match self {
-            CellExpr::Binop(op, left, right) => {
+            CellExpr::BinaryOp(op, left, right) => {
+                res.push('(');
                 res.push_str(&left.as_ref().to_string());
                 res.push_str(&op.to_string());
                 res.push_str(&right.as_ref().to_string());
+                res.push(')');
             }
             CellExpr::CellRef(pos) => res.push_str(&pos.to_string()),
             CellExpr::Sum(array) => {
@@ -129,6 +123,9 @@ impl fmt::Display for CellExpr {
                 res.push_str(&String::from(")"));
             },
             CellExpr::SumProduct(left,right) => {
+                if left.len() != right.len() {
+                    panic!("SumProduct: CellArrays cannot be if different length.");
+                }
                 res.push_str(&String::from("SUMPRODUCT("));
                 res.push_str(&left.to_string());
                 res.push_str(&String::from(","));
@@ -137,7 +134,8 @@ impl fmt::Display for CellExpr {
             },
             CellExpr::Number(x) => res.push_str(&x.to_string()),
             CellExpr::Percentage(val) => {
-                res.push_str(&val.to_string());
+                let p = val * dec!(100);
+                res.push_str(&p.to_string());
                 res.push_str(&String::from("%"));
             },
         }
@@ -146,28 +144,27 @@ impl fmt::Display for CellExpr {
 }
 
 #[derive(Debug)]
-enum Op {
+pub enum BinOp {
     Add,
     Sub,
     Div,
     Mult
 }
 
-impl fmt::Display for Op {
+impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut res = String::from("");
         match &self {
-            Op::Add  => res.push_str(&String::from("+")),
-            Op::Sub  => res.push_str(&String::from("-")),
-            Op::Div  => res.push_str(&String::from("/")),
-            Op::Mult => res.push_str(&String::from("*")),
+            BinOp::Add  => res.push_str(&String::from("+")),
+            BinOp::Sub  => res.push_str(&String::from("-")),
+            BinOp::Div  => res.push_str(&String::from("/")),
+            BinOp::Mult => res.push_str(&String::from("*")),
         }
         write!(f, "{}", res)
     }
 }
 
 // takes row, col as u32 and return cell label
-// if fix_cell then returns fixed value (e.g. $H$7))
 // takes u32 and returns the column label
 // ex: 4 -> D
 // ex: (4 + 26) -> DD
@@ -180,4 +177,58 @@ fn to_csv_col(col: u32) -> String {
         col_label.push_str(&c_str);
      }
      col_label
+}
+
+
+#[cfg(test)]
+mod tests {
+    use rust_decimal_macros::dec;
+    use super::*;
+
+    const CP_1: CellPosition = CellPosition { row: 100, col: 29, fix_row: false, fix_col: true };
+    const CP_2: CellPosition = CellPosition { row: 200, col: 29, fix_row: false, fix_col: true };
+    const CP_3: CellPosition = CellPosition { row: 100, col: 39, fix_row: false, fix_col: true };
+    const CP_4: CellPosition = CellPosition { row: 200, col: 39, fix_row: false, fix_col: true };
+    
+    #[test]
+    fn test_cell_position() {
+        assert_eq!(CP_1.to_string(), String::from("$DD101"));
+    }
+
+    #[test]
+    fn test_cell_array() {
+        let ca = CellArray::new(CP_1, CP_2);
+        assert_eq!(ca.to_string(), String::from("$DD101:$DD201"));
+    }
+
+
+    #[test]
+    #[should_panic]
+    fn test_cell_array_panic() {
+        CellArray::new(CP_1, CP_4);
+    }
+
+    #[test]
+    fn test_sum() {
+        let cv: CellValue = CellValue::Expr(CellExpr::Sum(CellArray::new(CP_1, CP_2)));
+        assert_eq!(cv.to_string(), "=SUM($DD101:$DD201)")
+    }
+
+    #[test]
+    fn test_sumproduct() {
+        let cv: CellValue = CellValue::Expr(CellExpr::SumProduct(CellArray::new(CP_1, CP_2), CellArray::new(CP_3, CP_4)));
+        assert_eq!(cv.to_string(), "=SUMPRODUCT($DD101:$DD201,$NN101:$NN201)");
+    }
+
+    #[test]
+    fn test_binop() {
+        let e1 = CellExpr::Number(dec!(3));
+        let e2: CellExpr = CellExpr::Percentage(dec!(0.1234567));
+        let e3 = CellExpr::BinaryOp(BinOp::Mult, Box::new(e1), Box::new(e2));
+        assert_eq!(e3.to_string(), "(3*12.3456700%)");
+        let e4: CellExpr = CellExpr::SumProduct(CellArray::new(CP_1, CP_2), CellArray::new(CP_3, CP_4));
+        let e5: CellExpr = CellExpr::BinaryOp(BinOp::Add, Box::new(e3), Box::new(e4));
+        assert_eq!(e5.to_string(), "((3*12.3456700%)+SUMPRODUCT($DD101:$DD201,$NN101:$NN201))");
+    }
+
 }
