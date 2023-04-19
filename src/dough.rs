@@ -1,5 +1,5 @@
 extern crate yaml_rust;
-use std::{collections::{HashMap, HashSet}};
+use std::{collections::{HashMap, HashSet}, fs};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 use rust_decimal_macros::dec;
 use yaml_rust::{YamlLoader};
@@ -29,11 +29,8 @@ pub struct DoughFormula {
     non_flour: HashSet<String>,
 }
 
-impl DoughFormula {
-    fn find_tot_flour
-}
-
 pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
+    let filename: String = fs::read_to_string(filename).expect("Unable to read file");
     let docs = YamlLoader::load_from_str(&filename).unwrap();
     let doc = &docs[0];
     
@@ -87,13 +84,40 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
         formula.components.insert(seg_name, seg);
     }
 
-    // build columns representing percentages
-    // let mut cols: Vec<Vec<String>> = Vec::new();
-    // let mut ingredients: Vec<String> = formula.flour.clone().into_iter().collect();
-    // let mut non_flour: Vec<String> = formula.non_flour.clone().into_iter().collect();
-    // ingredients.sort();
-    // non_flour.sort();
-    // ingredients.append(&mut non_flour);
+
+    // obtain ordering of components and ingredients
+    let mut flour: Vec<String> = formula.flour.clone().into_iter().collect();
+    let mut non_flour: Vec<String> = formula.non_flour.clone().into_iter().collect();
+    flour.sort();
+    non_flour.sort();
+    non_flour.append(&mut flour);
+    let ingredients = flour;
+    let mut dup_check = ingredients.clone();
+    dup_check.sort();
+    if dup_check.len() != ingredients.len() {
+        panic!("Duplicate component names are not allowed");
+    }
+
+    let mut components: Vec<String> = formula.components.keys().cloned().collect();
+    // 'mix' component must be last. panic if nonexistent
+    if components.iter().filter(|&c| (*c == String::from("mix"))).count() != 1 {
+        panic!("Must be exactly one component named 'mix'");
+    }
+    components.sort();
+
+    // dfs to check for cycle in component-ingredient graph rooted at 'mix'
+    // graph must also be connected!
+    dfs_components(&String::from("mix"), &formula.components, &mut HashSet::new(), &mut HashSet::new());
+
+    // TODO: check that all components contribute to mix. No dead ends.
+
+
+    // initialize the grid of cells. Columns are like:
+    // [INGREDIENTS, comp1 %, comp1 wgt, . . ., INGREDIENTS, tot %, tot wgt, IS_FLOUR
+    // components are associated with an odd index and its successor
+    // let cell_grid: Vec<Vec<CSVCell>> = Vec::with_capacity(components.len()*2 + 5);
+
+
     // for (j,(name, seg)) in formula.components.iter_mut().enumerate() {
     //     // initialize new column
     //     let mut seg_col: Vec<String> = Vec::with_capacity(ingredients.len() + 4); 
@@ -120,5 +144,39 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     formula
 }
 
+fn dfs_components(current: &String, 
+                    components: &HashMap<String, DoughComponent>,
+                    visited: &mut HashSet<String>,
+                    on_path: &mut HashSet<String>) {
+    visited.insert(current.to_string());
+    on_path.insert(current.to_string());
+    let comp = components.get(current).expect("dfs: cannot call on non-component");
+    for (ing_name, ing) in &comp.ingredients {
+        if components.contains_key(ing_name) {
+            if on_path.contains(ing_name) {
+                panic!("Component may not be self referencing (directly or indirectly)");
+            } 
+            if !visited.contains(ing_name) {
+                dfs_components(ing_name, components, visited, on_path)
+            }
+        } 
+    }
+    on_path.remove(current);
+}
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    #[test]
+    fn test_simple() {
+        yaml_to_dough_formula(String::from("./test.yaml"));
+    }
+
+    #[test]
+    #[should_panic(expected = "self referencing")]
+    fn test_cycle() {
+        yaml_to_dough_formula(String::from("./test_cycle.yaml"));
+    }
+
+}
