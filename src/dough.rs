@@ -1,6 +1,6 @@
 extern crate yaml_rust;
 use core::num;
-use std::{collections::{HashMap, HashSet}, fs, path::Component};
+use std::{collections::{HashMap, HashSet, VecDeque}, fs, path::Component};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 use rust_decimal_macros::dec;
 use yaml_rust::{YamlLoader};
@@ -8,6 +8,7 @@ use crate::csv_cell::{CSVCell, self, CellPosition, CellArray, CellValue, CellExp
 
 const ROW_OFFSET: usize = 1;
 const COL_OFFSET: usize = 2;
+const MIX: &str = "mix";
 
 #[derive(Debug)]
 enum Ingredient {
@@ -101,15 +102,18 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
         panic!("Duplicate component names are not allowed");
     }
 
-    let mut components: Vec<String> = formula.components.keys().cloned().collect();
-    if components.iter().filter(|&c| (*c == String::from("mix"))).count() != 1 {
-        // 'mix' component must be last. panic if nonexistent
+    let components: Vec<String> = formula.components.keys().cloned().collect();
+    if components.iter().filter(|&c| (*c == String::from(MIX))).count() != 1 {
         panic!("Must be exactly one component named 'mix'");
     }
-    components.sort();
 
     // dfs to check for cycle in component-ingredient graph rooted at 'mix'
-    dfs_components("mix", &formula.components, &mut HashSet::new(), &mut HashSet::new());
+    dfs_components(MIX, &formula.components, &mut HashSet::new(), &mut HashSet::new());
+    let mut components = bfs_components(&formula.components);
+    components.reverse();
+
+    // let component_percentages = component_percentages(&components, ingredients.len());
+    // println!("{:#?}", component_percentages);
 
     // for (j,(name, seg)) in formula.components.iter_mut().enumerate() {
     //     // initialize new column
@@ -139,8 +143,6 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
 
 
 // returns a tuple of CellPositions corresponding to ing_name's position in the table
-// row_header size is the number of rows used for the horizontal header
-// similarly for col_header_size
 fn ingredient_to_cell_pos(ing_name: &String,
                           comp_ordering: &Vec<String>,
                           ing_ordering: &Vec<String>) -> (CellPosition,CellPosition) {
@@ -154,9 +156,9 @@ fn ingredient_to_cell_pos(ing_name: &String,
 }
 
 // returns a HashMap<String, CSVCell> that maps component names to the
-// CSVCell associate with the position and expression for the component's
+// CSVCell associated with the position and expression for the component's
 // percentage total
-fn component_percentage(comp_ordering: &Vec<String>,
+fn component_percentages(comp_ordering: &Vec<String>,
                         num_ingredients: usize)
                         -> HashMap<String, CSVCell>{
     let mut result: HashMap<String, CSVCell> = HashMap::new();
@@ -182,32 +184,48 @@ fn component_percentage(comp_ordering: &Vec<String>,
 }
 
 // DFS on the component-ingredient graph
+//  - use to obtain spreadsheet formula for cell that represents overall total flour
 //  - will panic on finding cycle => invalid formula
 //  - will panic if it does not visit all components
-//  - use to obtain spreadsheet formula for cell that
-//    represents the total flour in the recipe
 fn dfs_components(current: &str, 
                     components: &HashMap<String, DoughComponent>,
                     visited: &mut HashSet<String>,
                     on_path: &mut HashSet<String>) {
     visited.insert(current.to_string());
     on_path.insert(current.to_string());
-    println!("{:#?}", current);
     let comp = components.get(current).expect("dfs: cannot call on non-component");
     for (ing_name, ing) in &comp.ingredients {
         if components.contains_key(ing_name) {
-        // only traversing over ingredients that are also components
             if on_path.contains(ing_name) {
                 panic!("Component may not be self referencing (directly or indirectly)");
             } 
-            // do not check if visted! 
             dfs_components(ing_name, components, visited, on_path);
         } 
     }
-    if current == "mix" && components.len() != visited.len() {
+    if current == MIX && components.len() != visited.len() {
         panic!("mix must reference all components directly or indirectly");
     }
     on_path.remove(current);
+}
+
+// BFS on the component-ingredient graph
+//  - use to obtain ordering of components
+fn bfs_components(components: &HashMap<String, DoughComponent>) -> Vec<String> {
+    let mut comp_order: Vec<String> = Vec::new();
+    let mut queue: VecDeque<&DoughComponent> = VecDeque::new();
+    comp_order.push(MIX.to_string());
+    queue.push_back(components.get(MIX).unwrap());
+    while !queue.is_empty() {
+        let comp = queue.pop_front().unwrap();
+        for (ing_name, _) in &comp.ingredients {
+            if components.contains_key(ing_name) && !comp_order.contains(ing_name) {
+                let next_comp = &components[ing_name];
+                comp_order.push(ing_name.to_string());
+                queue.push_back(&next_comp);
+            }
+        }
+    }
+    comp_order
 }
 
 #[cfg(test)]

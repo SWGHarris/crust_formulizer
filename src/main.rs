@@ -12,7 +12,7 @@ use std::fs;
 
 fn main() {
     // read in data
-    let formula: DoughFormula = dough::yaml_to_dough_formula("./test_valid.yaml".to_string());
+    let formula: DoughFormula = dough::yaml_to_dough_formula("./test_valid_branches.yaml".to_string());
     println!("{:#?}", formula);
 
 }
