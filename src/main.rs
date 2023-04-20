@@ -12,8 +12,7 @@ use std::fs;
 
 fn main() {
     // read in data
-    let filename: String = fs::read_to_string("./test.yaml").expect("Unable to read file");
-    let formula: DoughFormula = dough::yaml_to_dough_formula(filename);
+    let formula: DoughFormula = dough::yaml_to_dough_formula("./test_valid.yaml".to_string());
     println!("{:#?}", formula);
 
 }

@@ -19,30 +19,28 @@ impl CSVCell {
 
 #[derive(Debug)]
 pub struct CellPosition {
-    row: u32,
-    col: u32,
-    fix_row: bool,
-    fix_col: bool
+    pub row: u32,
+    pub col: u32,
+    pub fix_row: bool,
+    pub fix_col: bool
 }
 
 impl fmt::Display for CellPosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut result: String = Default::default();
-        let fix = String::from("$");
-        if self.fix_col {result.push_str(&fix);}
+        let fix = "$";
+        if self.fix_col {result.push_str(fix);}
         result.push_str(&to_csv_col(self.col));
-        if self.fix_row {result.push_str(&fix);}
+        if self.fix_row {result.push_str(fix);}
         result.push_str(&(self.row + 1).to_string());
         write!(f, "{}", result)
     }
 }
 
-// dim refers to the direction of the array.
 #[derive(Debug)]
 pub struct CellArray {
     from: CellPosition,
     to: CellPosition,
-    // dim: CellArrayDim
 }
 
 impl CellArray {
@@ -64,9 +62,9 @@ impl CellArray {
 
 impl fmt::Display for CellArray {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut res = String::default();
+        let mut res = String::new();
         res.push_str(&self.from.to_string());
-        res.push_str(&String::from(":"));
+        res.push_str(":");
         res.push_str(&self.to.to_string());
         write!(f, "{}", res)
     }
@@ -82,12 +80,12 @@ pub enum CellValue {
 
 impl fmt::Display for CellValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut res = String::from("");
+        let mut res = String::new();
         match &self {
             CellValue::Str(str) => res.push_str(str),
             CellValue::Empty => (),
             CellValue::Expr(expr) => {
-                res.push_str(&String::from("="));
+                res.push_str("=");
                 res.push_str(&expr.to_string())
             }
         }
@@ -107,7 +105,7 @@ pub enum CellExpr {
 
 impl fmt::Display for CellExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut res = String::from("");
+        let mut res = String::new();
         match self {
             CellExpr::BinaryOp(op, left, right) => {
                 res.push('(');
@@ -118,25 +116,25 @@ impl fmt::Display for CellExpr {
             }
             CellExpr::CellRef(pos) => res.push_str(&pos.to_string()),
             CellExpr::Sum(array) => {
-                res.push_str(&String::from("SUM("));
+                res.push_str("SUM(");
                 res.push_str(&array.to_string());
-                res.push_str(&String::from(")"));
+                res.push(')');
             },
             CellExpr::SumProduct(left,right) => {
                 if left.len() != right.len() {
                     panic!("SumProduct: CellArrays cannot be if different length.");
                 }
-                res.push_str(&String::from("SUMPRODUCT("));
+                res.push_str("SUMPRODUCT(");
                 res.push_str(&left.to_string());
-                res.push_str(&String::from(","));
+                res.push(',');
                 res.push_str(&right.to_string());
-                res.push_str(&String::from(")"));
+                res.push(')');
             },
             CellExpr::Number(x) => res.push_str(&x.to_string()),
             CellExpr::Percentage(val) => {
                 let p = val * dec!(100);
                 res.push_str(&p.to_string());
-                res.push_str(&String::from("%"));
+                res.push('%');
             },
         }
         write!(f, "{}", res)
@@ -153,12 +151,12 @@ pub enum BinOp {
 
 impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut res = String::from("");
+        let mut res = String::new();
         match &self {
-            BinOp::Add  => res.push_str(&String::from("+")),
-            BinOp::Sub  => res.push_str(&String::from("-")),
-            BinOp::Div  => res.push_str(&String::from("/")),
-            BinOp::Mult => res.push_str(&String::from("*")),
+            BinOp::Add  => res.push('+'),
+            BinOp::Sub  => res.push('-'),
+            BinOp::Div  => res.push('/'),
+            BinOp::Mult => res.push('*'),
         }
         write!(f, "{}", res)
     }
@@ -169,12 +167,11 @@ impl fmt::Display for BinOp {
 // ex: 4 -> D
 // ex: (4 + 26) -> DD
 fn to_csv_col(col: u32) -> String {
-    let c: u8 = b'A' + ((col % 26) as u8);
+    let c: char= (b'A' + ((col % 26) as u8)) as char;
     let n = (col / 26) + 1;
-    let mut col_label = String::from("");
+    let mut col_label = String::new();
     for _ in 0..n {
-        let c_str = (c as char).to_string();
-        col_label.push_str(&c_str);
+        col_label.push(c);
      }
      col_label
 }
@@ -200,7 +197,6 @@ mod tests {
         let ca = CellArray::new(CP_1, CP_2);
         assert_eq!(ca.to_string(), String::from("$DD101:$DD201"));
     }
-
 
     #[test]
     #[should_panic]
