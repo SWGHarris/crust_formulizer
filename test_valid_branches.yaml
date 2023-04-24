@@ -1,0 +1,39 @@
+name: bread title
+dough_serving: 500.0  # recommended dough size
+batch_size: 2         # recommended batch size
+components:
+  -
+    name: stem_1 # a formula must have a segment called mix
+    ingredients:
+      - [all purpose flour, 450.0,  true]
+      - [poolish,           300.0, false]
+  -
+    name: poolish
+    ingredients:
+      - [all purpose flour,  75.0,  true]
+      - [whole wheat flour,  75.0,  true]
+      - [water,             150.0, false]
+      - [yeast,               1.0, false]
+  -
+    name: mix # a formula must have a segment called mix
+    ingredients:
+      - [all purpose flour, 450.0,  true]
+      - [water,             500.0, false]
+      - [stem_2,           300.0, false]
+  -
+    name: branch_1 # a formula must have a segment called mix
+    ingredients:
+      - [all purpose flour, 450.0,  true]
+      - [stem_1,           300.0, false]
+  -
+    name: stem_2 # a formula must have a segment called mix
+    ingredients:
+      - [all purpose flour, 450.0,  true]
+      - [branch_2,           300.0, false]
+      - [branch_1,           300.0, false]
+  -
+    name: branch_2 # a formula must have a segment called mix
+    ingredients:
+      - [all purpose flour, 450.0,  true]
+      - [stem_1,           300.0, false]
+      
