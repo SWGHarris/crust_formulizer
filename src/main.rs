@@ -9,10 +9,9 @@ use std::fs;
 // 3. create simple front-end
 // 4. the data structure for Formula can be built recursively
 
-
 fn main() {
     // read in data
-    let formula: DoughFormula = dough::yaml_to_dough_formula("./test_valid_branches.yaml".to_string());
+    let formula: DoughFormula =
+        dough::yaml_to_dough_formula("./test_valid_1.yaml".to_string());
     println!("{:#?}", formula);
-
 }
