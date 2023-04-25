@@ -13,5 +13,5 @@ fn main() {
     // read in data
     let formula: DoughFormula =
         dough::yaml_to_dough_formula("./test_valid_1.yaml".to_string());
-    println!("{:#?}", formula);
+    // println!("{:#?}", formula);
 }
