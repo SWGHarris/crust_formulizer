@@ -151,39 +151,10 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     test_cells.append(&mut ingredient_labels);
     let test_grid_just_totals = csv_cells_to_grid(&test_cells);
     println!("{}",  test_grid_just_totals);
+    
     formula
 }
 
-// returns a tuple of CellPositions corresponding to ing_name's position in the table
-// fn ingredient_to_cell_pos(
-//     ing_name: &String,
-//     comp_ordering: &Vec<String>,
-//     ing_ordering: &Vec<String>,
-// ) -> (CellPosition, CellPosition) {
-//     let ing_pos = ing_ordering
-//         .iter()
-//         .position(|name| *name == *ing_name)
-//         .unwrap();
-//     let comp_pos = comp_ordering
-//         .iter()
-//         .position(|name| *name == *ing_name)
-//         .unwrap();
-//     let row = (ing_pos + ROW_OFFSET) as u32;
-//     let col = (comp_pos + COL_OFFSET) as u32;
-//     let percent_pos = CellPosition {
-//         row,
-//         col,
-//         fix_row: false,
-//         fix_col: false,
-//     };
-//     let value_pos = CellPosition {
-//         row,
-//         col: col + 1,
-//         fix_row: false,
-//         fix_col: false,
-//     };
-//     (percent_pos, value_pos)
-// }
 
 // returns a Vec<CSVCell> that represents the cells for ingredient labels
 fn ingredient_label_cells(

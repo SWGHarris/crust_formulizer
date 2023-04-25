@@ -24,6 +24,7 @@ impl CSVCell {
     }
 }
 
+// Returns a String of the csv representation for the given cells
 pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
     let mut grid: HashMap<u32, HashMap<u32, CellValue>> = HashMap::new();
     let mut max_row: u32 = 0;
@@ -33,7 +34,7 @@ pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
             grid.insert(cell.position.row, HashMap::new());
         }
         if grid[&cell.position.row].contains_key(&cell.position.col) {
-            panic!("cells contains overlapping CSVCells")
+            panic!("csv grid cannot contain overlapping CSVCells")
         }
         let x = cell.position.row;
         let y = cell.position.col;
