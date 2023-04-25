@@ -1,8 +1,10 @@
 use core::fmt;
+use std::{collections::HashMap, cmp};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 
-#[derive(Debug)]
+
+#[derive(Debug, Clone)]
 pub struct CSVCell {
     pub value: CellValue,
     pub position: CellPosition,
@@ -20,6 +22,41 @@ impl CSVCell {
             },
         }
     }
+}
+
+// Returns a String of the csv representation for the given cells
+pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
+    let mut grid: HashMap<u32, HashMap<u32, CellValue>> = HashMap::new();
+    let mut max_row: u32 = 0;
+    let mut max_col:u32 = 0;
+    for cell in cells {
+        if !grid.contains_key(&cell.position.row) {
+            grid.insert(cell.position.row, HashMap::new());
+        }
+        if grid[&cell.position.row].contains_key(&cell.position.col) {
+            panic!("csv grid cannot contain overlapping CSVCells")
+        }
+        let x = cell.position.row;
+        let y = cell.position.col;
+        max_row = cmp::max(x, max_row);
+        max_col = cmp::max(y, max_col);
+        grid.get_mut(&x).map(|val| val.insert(y, cell.value.clone()));
+    }
+
+    let mut grid_string = String::new();
+    for row in 0..(max_row + 1) {
+        for col in 0..(max_col + 1) {
+            if grid.contains_key(&row) && grid[&row].contains_key(&col) {
+                let val = &grid[&row][&col].to_string();
+                grid_string.push_str(val);
+            }
+            if col != max_col {
+                grid_string.push(',');
+            }
+        }
+        grid_string.push('\n');
+    }
+    grid_string
 }
 
 // TODO: Should CellPosition ever be fixed? Or should CellRefs be fixable?
@@ -91,7 +128,7 @@ impl fmt::Display for CellArray {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CellValue {
     Str(String),
     Expr(CellExpr),
@@ -150,10 +187,10 @@ impl fmt::Display for CellExpr {
                 res.push_str(&right.to_string());
                 res.push(')');
             }
-            CellExpr::Number(x) => res.push_str(&x.to_string()),
+            CellExpr::Number(x) => res.push_str(&x.round_dp(3).to_string()),
             CellExpr::Percentage(val) => {
                 let p = val * dec!(100);
-                res.push_str(&p.to_string());
+                res.push_str(&p.round_dp(3).to_string());
                 res.push('%');
             }
         }

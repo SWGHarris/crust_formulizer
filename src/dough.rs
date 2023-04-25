@@ -1,5 +1,5 @@
 extern crate yaml_rust;
-use crate::csv_cell::{self, BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue};
+use crate::csv_cell::{self, BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue, csv_cells_to_grid};
 use core::num;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use rust_decimal_macros::dec;
@@ -135,39 +135,62 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     let component_percentages: HashMap<String, HashMap<String, CSVCell>> = component_percentages(&formula.components,
                                                                                                     &component_order, 
                                                                                                     &ingredient_order);
-    println!("{:#?}", component_percentages);
+    
+    let mut component_percentages_vec: Vec<CSVCell> = component_percentages.iter()
+                                                                       .flat_map(|(_,v)| v.values().cloned())
+                                                                       .collect();
+    let mut ingredient_labels = ingredient_label_cells(&ingredient_order, component_order.len());
+
+
+    let mut comp_totals_vec: Vec<CSVCell> = component_totals.values().cloned().collect();
+    
+    // Testing CSVCell
+    let mut test_cells = Vec::new();
+    test_cells.append(&mut  comp_totals_vec);
+    test_cells.append(&mut component_percentages_vec);
+    test_cells.append(&mut ingredient_labels);
+    let test_grid_just_totals = csv_cells_to_grid(&test_cells);
+    println!("{}",  test_grid_just_totals);
+    
     formula
 }
 
-// returns a tuple of CellPositions corresponding to ing_name's position in the table
-fn ingredient_to_cell_pos(
-    ing_name: &String,
-    comp_ordering: &Vec<String>,
+
+// returns a Vec<CSVCell> that represents the cells for ingredient labels
+fn ingredient_label_cells(
     ing_ordering: &Vec<String>,
-) -> (CellPosition, CellPosition) {
-    let ing_pos = ing_ordering
-        .iter()
-        .position(|name| *name == *ing_name)
-        .unwrap();
-    let comp_pos = comp_ordering
-        .iter()
-        .position(|name| *name == *ing_name)
-        .unwrap();
-    let row = (ing_pos + ROW_OFFSET) as u32;
-    let col = (comp_pos + COL_OFFSET) as u32;
-    let percent_pos = CellPosition {
-        row,
-        col,
-        fix_row: false,
-        fix_col: false,
-    };
-    let value_pos = CellPosition {
-        row,
-        col: col + 1,
-        fix_row: false,
-        fix_col: false,
-    };
-    (percent_pos, value_pos)
+    num_components: usize
+) -> Vec<CSVCell> {
+    let mut result: Vec<CSVCell> = Vec::new();
+    for (index, ing_name) in ing_ordering.iter().enumerate() {
+        let label_position_1 = CellPosition {
+            row: (ROW_OFFSET + index) as u32,
+            col: 0,
+            fix_row: false,
+            fix_col: false,
+        };
+
+        let label_position_2 = CellPosition {
+            row: label_position_1.row,
+            col: 1 + 2*num_components as u32,
+            fix_row: false,
+            fix_col: false,
+        };
+
+        let label_cell_1 = CSVCell {
+            value: CellValue::Str(ing_name.to_string()),
+            position: label_position_1.clone(),
+        };
+
+        let label_cell_2 = CSVCell {
+            value: CellValue::Expr(CellExpr::CellRef(label_position_1)),
+            position: label_position_2,
+        };
+
+        result.push(label_cell_1);
+        result.push(label_cell_2);
+    }
+    result
 }
 
 // returns a HashMap<String, CSVCell> that maps component names to the
@@ -181,7 +204,7 @@ fn component_totals(
     for (index, comp_name) in comp_ordering.iter().enumerate() {
         let total_position = CellPosition {
             row: (ROW_OFFSET + num_ingredients) as u32,
-            col: (index + COL_OFFSET) as u32,
+            col: (2*index + COL_OFFSET) as u32,
             fix_row: false,
             fix_col: false,
         };
@@ -235,7 +258,7 @@ fn component_percentages(
                 };
     
                 let percent_cell = CSVCell {
-                    value: CellValue::Expr(CellExpr::Number(ing_val)),
+                    value: CellValue::Expr(CellExpr::Percentage(ing_val)),
                     position: percent_position.clone(),
                 };
     
