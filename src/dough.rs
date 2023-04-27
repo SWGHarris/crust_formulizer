@@ -1,14 +1,10 @@
 extern crate yaml_rust;
-use crate::csv_cell::{self, BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue, csv_cells_to_grid};
-use core::num;
+use crate::csv_cell::{ BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue, csv_cells_to_grid, CellRef};
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use std::{
-    boxed,
     collections::{HashMap, HashSet, VecDeque},
     fs,
-    path::Component,
-    result,
 };
 use yaml_rust::YamlLoader;
 
@@ -27,7 +23,6 @@ enum Ingredient {
 // "mix" may not be referenced
 #[derive(Debug)]
 struct DoughComponent {
-    name: String,
     ingredients: HashMap<String, Ingredient>,
 }
 
@@ -74,7 +69,6 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     for (_, s) in doc["components"].as_vec().unwrap().iter().enumerate() {
         let seg_name = s["name"].as_str().unwrap().to_string();
         let mut seg: DoughComponent = DoughComponent {
-            name: seg_name.clone(),
             ingredients: HashMap::new(),
         };
 
@@ -163,27 +157,24 @@ fn ingredient_label_cells(
 ) -> Vec<CSVCell> {
     let mut result: Vec<CSVCell> = Vec::new();
     for (index, ing_name) in ing_ordering.iter().enumerate() {
-        let label_position_1 = CellPosition {
-            row: (ROW_OFFSET + index) as u32,
-            col: 0,
+        let label_ref_1 = CellRef {
+            pos: CellPosition {row: (ROW_OFFSET + index) as u32, col: 0},
             fix_row: false,
             fix_col: false,
         };
 
         let label_position_2 = CellPosition {
-            row: label_position_1.row,
-            col: 1 + 2*num_components as u32,
-            fix_row: false,
-            fix_col: false,
+            row: label_ref_1.pos.row,
+            col: 1 + 2*num_components as u32
         };
 
         let label_cell_1 = CSVCell {
             value: CellValue::Str(ing_name.to_string()),
-            position: label_position_1.clone(),
+            position: label_ref_1.pos.clone(),
         };
 
         let label_cell_2 = CSVCell {
-            value: CellValue::Expr(CellExpr::CellRef(label_position_1)),
+            value: CellValue::Expr(CellExpr::Ref(label_ref_1)),
             position: label_position_2,
         };
 
@@ -202,21 +193,23 @@ fn component_totals(
 ) -> HashMap<String, CSVCell> {
     let mut result: HashMap<String, CSVCell> = HashMap::new();
     for (index, comp_name) in comp_ordering.iter().enumerate() {
-        let total_position = CellPosition {
-            row: (ROW_OFFSET + num_ingredients) as u32,
-            col: (2*index + COL_OFFSET) as u32,
+        let total_ref = CellRef {
+            pos: CellPosition {
+                row: (ROW_OFFSET + num_ingredients) as u32,
+                col: (2*index + COL_OFFSET) as u32
+            },
             fix_row: false,
             fix_col: false,
         };
-        let from = CellPosition {
-            row: total_position.row - num_ingredients as u32,
-            col: total_position.col,
+        let from = CellRef {
+            pos: CellPosition { row: total_ref.pos.row - num_ingredients as u32,
+                col: total_ref.pos.col },
             fix_row: false,
             fix_col: false,
         };
-        let to = CellPosition {
-            row: total_position.row - 1 as u32,
-            col: total_position.col,
+        let to = CellRef {
+            pos: CellPosition { row: total_ref.pos.row - 1 as u32,
+            col: total_ref.pos.col },
             fix_row: false,
             fix_col: false,
         };
@@ -224,7 +217,7 @@ fn component_totals(
         let total_val = CellValue::Expr(CellExpr::Sum(sum_array));
         let total_cell = CSVCell {
             value: total_val,
-            position: total_position,
+            position: total_ref.pos,
         };
         result.insert(comp_name.to_string(), total_cell);
     }
@@ -250,16 +243,16 @@ fn component_percentages(
                     Ingredient::NonFlour(x) => x,
                 };
     
-                let percent_position = CellPosition {
-                    row: (ROW_OFFSET + row) as u32,
-                    col: (2*col + COL_OFFSET) as u32,
+                let percent_ref = CellRef {
+                    pos: CellPosition {row: (ROW_OFFSET + row) as u32,
+                    col: (2*col + COL_OFFSET) as u32},
                     fix_row: false,
                     fix_col: false,
                 };
     
                 let percent_cell = CSVCell {
                     value: CellValue::Expr(CellExpr::Percentage(ing_val)),
-                    position: percent_position.clone(),
+                    position: percent_ref.pos.clone(),
                 };
     
                 comp_percents.insert(ing_name.to_string(),percent_cell);
@@ -330,10 +323,17 @@ fn component_mass_aux(
                 panic!("Component may not be self referencing (directly or indirectly)");
             }
 
-            let ing_percentage = component_percentages[current][ing_name]
+            let ing_percent_pos = component_percentages[current][ing_name]
                                                     .position
-                                                    .to_fixed(true, true);
-            let ing_ref = CellExpr::CellRef(ing_percentage);
+                                                    .clone();
+
+            let ing_percent_ref = CellRef {
+                pos: ing_percent_pos,
+                fix_row: true,
+                fix_col: true
+            };
+
+            let ing_ref = CellExpr::Ref(ing_percent_ref);
             ref_stack.push_front(ing_ref);
             component_mass_aux(current, components, component_percentages, component_masses, ref_stack, visited, on_path);
             ref_stack.pop_front();
