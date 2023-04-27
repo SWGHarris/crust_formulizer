@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, cmp};
+use std::{collections::HashMap, cmp, cell};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 
@@ -11,16 +11,8 @@ pub struct CSVCell {
 }
 
 impl CSVCell {
-    fn new(row: u32, col: u32, fix_row: bool, fix_col: bool, value: CellValue) -> Self {
-        CSVCell {
-            value,
-            position: CellPosition {
-                row,
-                col,
-                fix_row,
-                fix_col,
-            },
-        }
+    fn new(position: CellPosition, value: CellValue) -> Self {
+        CSVCell { value, position }
     }
 }
 
@@ -64,56 +56,49 @@ pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
 pub struct CellPosition {
     pub row: u32,
     pub col: u32,
-    pub fix_row: bool,
-    pub fix_col: bool,
 }
 
 impl CellPosition {
-    pub fn to_fixed(&self, fix_col: bool, fix_row: bool) -> Self {
+    pub fn to_fixed(&self) -> Self {
         CellPosition {
             row: self.row,
             col: self.col,
-            fix_row,
-            fix_col,
         }
     }
 }
 
 impl fmt::Display for CellPosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut result: String = Default::default();
-        let fix = "$";
-        if self.fix_col {
-            result.push_str(fix);
-        }
-        result.push_str(&to_csv_col(self.col));
-        if self.fix_row {
-            result.push_str(fix);
-        }
-        result.push_str(&(self.row + 1).to_string());
+        let cell_ref = CellExpr::Ref(
+            CellRef {
+                pos: self.clone(), 
+                fix_row: false, 
+                fix_col: false }
+            );
+        let mut result: String = cell_ref.to_string();
         write!(f, "{}", result)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CellArray {
-    from: CellPosition,
-    to: CellPosition,
+    from: CellRef,
+    to: CellRef,
 }
 
 impl CellArray {
-    pub fn new(from: CellPosition, to: CellPosition) -> Self {
-        if from.col != to.col && from.row != to.row {
+    pub fn new(from: CellRef, to: CellRef) -> Self {
+        if from.pos.col != to.pos.col && from.pos.row != to.pos.row {
             panic!("CellArray: either 'from' or 'to' must have same value");
         }
         CellArray { from, to }
     }
 
     pub fn len(&self) -> u32 {
-        if self.from.col != self.to.col {
-            self.to.col - self.from.col + 1
+        if self.from.pos.col != self.to.pos.col {
+            self.to.pos.col - self.from.pos.col + 1
         } else {
-            self.to.row - self.from.row + 1
+            self.to.pos.row - self.from.pos.row + 1
         }
     }
 }
@@ -150,10 +135,32 @@ impl fmt::Display for CellValue {
     }
 }
 
+#[derive(Debug,Clone)]
+pub struct CellRef {
+    pub pos: CellPosition,
+    pub fix_row: bool,
+    pub fix_col: bool
+}
+
+impl fmt::Display for CellRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut res = String::new();
+        if self.fix_col {
+            res.push('$');
+        }
+        res.push_str(&to_csv_col(self.pos.col));
+        if self.fix_row {
+            res.push('$');
+        }
+        res.push_str(&(self.pos.row + 1).to_string());
+        write!(f, "{}", res)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CellExpr {
     BinaryOp(BinOp, Box<CellExpr>, Box<CellExpr>),
-    CellRef(CellPosition),
+    Ref(CellRef),
     Sum(CellArray),
     SumProduct(CellArray, CellArray),
     Number(Decimal),
@@ -171,7 +178,9 @@ impl fmt::Display for CellExpr {
                 res.push_str(&right.as_ref().to_string());
                 res.push(')');
             }
-            CellExpr::CellRef(pos) => res.push_str(&pos.to_string()),
+            CellExpr::Ref(cell_ref) => {
+                res.push_str(&cell_ref.to_string());
+            }
             CellExpr::Sum(array) => {
                 res.push_str("SUM(");
                 res.push_str(&array.to_string());
@@ -238,27 +247,23 @@ mod tests {
     use super::*;
     use rust_decimal_macros::dec;
 
-    const CP_1: CellPosition = CellPosition {
-        row: 100,
-        col: 29,
+    const CP_1: CellRef = CellRef {
+        pos: CellPosition{row: 100, col: 29},
         fix_row: false,
         fix_col: true,
     };
-    const CP_2: CellPosition = CellPosition {
-        row: 200,
-        col: 29,
+    const CP_2: CellRef = CellRef {
+        pos: CellPosition{row: 200, col: 29},
         fix_row: false,
         fix_col: true,
     };
-    const CP_3: CellPosition = CellPosition {
-        row: 100,
-        col: 39,
+    const CP_3: CellRef = CellRef {
+        pos: CellPosition{row: 100, col: 39},
         fix_row: false,
         fix_col: true,
     };
-    const CP_4: CellPosition = CellPosition {
-        row: 200,
-        col: 39,
+    const CP_4: CellRef = CellRef {
+        pos: CellPosition{row: 200, col: 39},
         fix_row: false,
         fix_col: true,
     };
