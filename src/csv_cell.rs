@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, cmp, cell};
+use std::{collections::HashMap, cmp};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 
@@ -8,12 +8,6 @@ use rust_decimal_macros::dec;
 pub struct CSVCell {
     pub value: CellValue,
     pub position: CellPosition,
-}
-
-impl CSVCell {
-    fn new(position: CellPosition, value: CellValue) -> Self {
-        CSVCell { value, position }
-    }
 }
 
 // Returns a String of the csv representation for the given cells
@@ -51,7 +45,7 @@ pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
     grid_string
 }
 
-// TODO: Should CellPosition ever be fixed? Or should CellRefs be fixable?
+
 #[derive(Debug, Clone)]
 pub struct CellPosition {
     pub row: u32,
@@ -75,7 +69,7 @@ impl fmt::Display for CellPosition {
                 fix_row: false, 
                 fix_col: false }
             );
-        let mut result: String = cell_ref.to_string();
+        let result: String = cell_ref.to_string();
         write!(f, "{}", result)
     }
 }

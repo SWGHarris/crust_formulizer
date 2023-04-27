@@ -1,14 +1,10 @@
 extern crate yaml_rust;
-use crate::csv_cell::{self, BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue, csv_cells_to_grid, CellRef};
-use core::num;
+use crate::csv_cell::{ BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellValue, csv_cells_to_grid, CellRef};
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use std::{
-    boxed,
     collections::{HashMap, HashSet, VecDeque},
     fs,
-    path::Component,
-    result,
 };
 use yaml_rust::YamlLoader;
 
@@ -27,7 +23,6 @@ enum Ingredient {
 // "mix" may not be referenced
 #[derive(Debug)]
 struct DoughComponent {
-    name: String,
     ingredients: HashMap<String, Ingredient>,
 }
 
@@ -74,7 +69,6 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     for (_, s) in doc["components"].as_vec().unwrap().iter().enumerate() {
         let seg_name = s["name"].as_str().unwrap().to_string();
         let mut seg: DoughComponent = DoughComponent {
-            name: seg_name.clone(),
             ingredients: HashMap::new(),
         };
 
