@@ -36,7 +36,7 @@ pub struct DoughFormula {
 
 
 /// Converts yaml string of dough formula to DoughFormula struct
-pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
+pub fn yaml_to_dough_formula(filename: String) -> (DoughFormula, String) {
     let filename: String = fs::read_to_string(filename).expect("Unable to read file");
     let docs = YamlLoader::load_from_str(&filename).unwrap();
     let doc = &docs[0];
@@ -153,14 +153,13 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     test_cells.append(&mut component_percentages_vec);
     test_cells.append(&mut ingredient_labels);
     test_cells.append(&mut comp_mass_vec);
-    let test_grid_just_totals = csv_cells_to_grid(&test_cells);
-    println!("{}",  test_grid_just_totals);
+    let csv_string = csv_cells_to_grid(&test_cells);
     
-    formula
+    (formula, csv_string)
 }
 
 
-/// returns a Vec<CSVCell> that represents the cells for ingredient labels
+/// obtain Vec<CSVCell> that represents the cells for ingredient labels
 fn ingredient_label_cells(
     ing_ordering: &Vec<String>,
     num_components: usize
@@ -235,13 +234,14 @@ fn component_totals(
 }
 
 /// returns a HashMap that maps component names to another HashMap
-/// The inner hashmap associated the component ingredients to their
-/// percentage amount (as provided by input)
+/// - The inner hashmap associates the component ingredients to their
+///   percentage amount (as provided by input)
 fn component_percentages(
     components: &HashMap<String, DoughComponent>,
     component_order: &Vec<String>,
     ingredient_order: &Vec<String>,
 ) -> HashMap<String, HashMap<String, CSVCell>> {
+
     let mut result: HashMap<String, HashMap<String, CSVCell>> = HashMap::new();
     for (col, comp_name) in component_order.iter().enumerate() {
         let comp: &DoughComponent = &components[comp_name];
@@ -274,13 +274,14 @@ fn component_percentages(
 }
 
 
-/// Obtain Vec holding the CSVCell for the mass columns
+/// Obtain Vec holding the CSVCells for the mass columns
 fn component_mass(
     components: &HashMap<String, DoughComponent>,
     component_order: &Vec<String>,
     ingredient_order: &Vec<String>,
     component_percentages: &HashMap<String, HashMap<String, CSVCell>>,
 ) -> Vec<CSVCell> {
+
     let mut component_masses: HashMap<String, CellExpr> = HashMap::new();
     component_mass_aux(MIX,
                         components, 
@@ -349,10 +350,12 @@ fn component_mass(
          mass_vec.push(cell);
     }
 
+    // TODO: CellValues should be multiplied by total dough
+
     mass_vec
 }
 
-///  Obtain the cell expressions that represents the actual
+///  (Auxiliary) Obtain the cell expressions that represents the actual
 ///  proportion of each component.
 ///  - must be called on the root (MIX)
 ///  - out parameter component_masses holds CellExpr assoiciated with
@@ -464,8 +467,7 @@ fn validate_structure(
 
 
 
-// BFS on the component-ingredient graph
-//  - use to obtain ordering of components
+///  Return ordering of components
 fn bfs_components(components: &HashMap<String, DoughComponent>) -> Vec<String> {
     let mut comp_order: Vec<String> = Vec::new();
     let mut queue: VecDeque<&DoughComponent> = VecDeque::new();

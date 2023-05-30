@@ -166,11 +166,15 @@ impl fmt::Display for CellExpr {
         let mut res = String::new();
         match self {
             CellExpr::BinaryOp(op, left, right) => {
-                res.push('(');
+                if matches!(op, BinOp::Add | BinOp::Sub) {
+                    res.push('(');
+                }
                 res.push_str(&left.as_ref().to_string());
                 res.push_str(&op.to_string());
                 res.push_str(&right.as_ref().to_string());
-                res.push(')');
+                if matches!(op, BinOp::Add | BinOp::Sub) {
+                    res.push(')');
+                }
             }
             CellExpr::Ref(cell_ref) => {
                 res.push_str(&cell_ref.to_string());
@@ -201,7 +205,7 @@ impl fmt::Display for CellExpr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinOp {
     Add,
     Sub,

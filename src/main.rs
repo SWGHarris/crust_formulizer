@@ -11,7 +11,6 @@ use std::fs;
 
 fn main() {
     // read in data
-    let formula: DoughFormula =
-        dough::yaml_to_dough_formula("./test_valid_branches.yaml".to_string());
-    // println!("{:#?}", formula);
+    let (formula, csv_string) = dough::yaml_to_dough_formula("./test_valid_branches.yaml".to_string()); 
+    fs::write("./test.csv", csv_string).expect("unable to write file");
 }
