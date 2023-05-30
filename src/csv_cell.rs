@@ -10,7 +10,7 @@ pub struct CSVCell {
     pub position: CellPosition,
 }
 
-// Returns a String of the csv representation for the given cells
+/// Return String for csv representation for the given cells
 pub fn csv_cells_to_grid(cells: &Vec<CSVCell>) -> String {
     let mut grid: HashMap<u32, HashMap<u32, CellValue>> = HashMap::new();
     let mut max_row: u32 = 0;

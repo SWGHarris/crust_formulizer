@@ -3,7 +3,7 @@ use crate::csv_cell::{ BinOp, CSVCell, CellArray, CellExpr, CellPosition, CellVa
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque, vec_deque},
     fs,
 };
 use yaml_rust::YamlLoader;
@@ -34,6 +34,8 @@ pub struct DoughFormula {
     non_flour: HashSet<String>,
 }
 
+
+/// Converts yaml string of dough formula to DoughFormula struct
 pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
     let filename: String = fs::read_to_string(filename).expect("Unable to read file");
     let docs = YamlLoader::load_from_str(&filename).unwrap();
@@ -125,24 +127,32 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
         &mut HashSet::new(),
     );
 
-    let component_totals: HashMap<String, CSVCell> = component_totals(&component_order, ingredient_order.len());
-    let component_percentages: HashMap<String, HashMap<String, CSVCell>> = component_percentages(&formula.components,
-                                                                                                    &component_order, 
-                                                                                                    &ingredient_order);
+    let component_totals = component_totals(&component_order,
+                                                                      ingredient_order.len());
+    let component_percentages = component_percentages(&formula.components,
+                                                                                           &component_order,
+                                                                                           &ingredient_order);
     
     let mut component_percentages_vec: Vec<CSVCell> = component_percentages.iter()
-                                                                       .flat_map(|(_,v)| v.values().cloned())
-                                                                       .collect();
-    let mut ingredient_labels = ingredient_label_cells(&ingredient_order, component_order.len());
-
+                                                                           .flat_map(|(_,v)| v.values().cloned())
+                                                                           .collect();
+    let mut ingredient_labels = ingredient_label_cells(
+                                                  &ingredient_order,
+                                                  component_order.len());
 
     let mut comp_totals_vec: Vec<CSVCell> = component_totals.values().cloned().collect();
+
+    let mut comp_mass_vec = component_mass(&formula.components,
+                                           &component_order,
+                                           &ingredient_order,
+                                           &component_percentages);
     
     // Testing CSVCell
     let mut test_cells = Vec::new();
-    test_cells.append(&mut  comp_totals_vec);
+    test_cells.append(&mut comp_totals_vec);
     test_cells.append(&mut component_percentages_vec);
     test_cells.append(&mut ingredient_labels);
+    test_cells.append(&mut comp_mass_vec);
     let test_grid_just_totals = csv_cells_to_grid(&test_cells);
     println!("{}",  test_grid_just_totals);
     
@@ -150,7 +160,7 @@ pub fn yaml_to_dough_formula(filename: String) -> DoughFormula {
 }
 
 
-// returns a Vec<CSVCell> that represents the cells for ingredient labels
+/// returns a Vec<CSVCell> that represents the cells for ingredient labels
 fn ingredient_label_cells(
     ing_ordering: &Vec<String>,
     num_components: usize
@@ -184,9 +194,9 @@ fn ingredient_label_cells(
     result
 }
 
-// returns a HashMap<String, CSVCell> that maps component names to the
-// CSVCell associated with the position and expression for the component's
-// percentage total
+/// returns a HashMap<String, CSVCell> that maps component names to the
+/// CSVCell associated with the position and expression for the component's
+/// percentage total
 fn component_totals(
     comp_ordering: &Vec<String>,
     num_ingredients: usize,
@@ -224,9 +234,9 @@ fn component_totals(
     result
 }
 
-// returns a HashMap that maps component names to another HashMap
-// The inner hashmap associated the component ingredients to their
-// percentage amount (as provided by input)
+/// returns a HashMap that maps component names to another HashMap
+/// The inner hashmap associated the component ingredients to their
+/// percentage amount (as provided by input)
 fn component_percentages(
     components: &HashMap<String, DoughComponent>,
     component_order: &Vec<String>,
@@ -263,10 +273,14 @@ fn component_percentages(
     result
 }
 
+
+/// Obtain Vec holding the CSVCell for the mass columns
 fn component_mass(
     components: &HashMap<String, DoughComponent>,
+    component_order: &Vec<String>,
+    ingredient_order: &Vec<String>,
     component_percentages: &HashMap<String, HashMap<String, CSVCell>>,
-) -> HashMap<String, CellExpr> {
+) -> Vec<CSVCell> {
     let mut component_masses: HashMap<String, CellExpr> = HashMap::new();
     component_mass_aux(MIX,
                         components, 
@@ -275,13 +289,74 @@ fn component_mass(
                         &mut VecDeque::new(), 
                         &mut HashSet::new(), 
                         &mut HashSet::new());
-    component_masses
+
+    let mut mass_vec: Vec<CSVCell> = Vec::new();
+    for (col, comp_name) in component_order.iter().enumerate() {
+        for (row, _) in ingredient_order.iter().enumerate()  {
+            let percentage_pos = CellRef {
+                pos: CellPosition {row: (ROW_OFFSET + row) as u32,
+                col: (2*col + COL_OFFSET) as u32},
+                fix_row: false,
+                fix_col: false,
+            };
+
+            let mut mass_pos = percentage_pos.clone();
+            mass_pos.pos.col += 1;
+
+            
+            let value: CellValue;
+            if comp_name != MIX {
+                value = CellValue::Expr(CellExpr::BinaryOp(
+                                    BinOp::Div,
+                                    Box::new(CellExpr::Ref(percentage_pos)),
+                                    Box::new(component_masses[comp_name].clone())));
+            } else {
+                value = CellValue::Expr(CellExpr::Ref(percentage_pos));
+            }
+
+            let cell = CSVCell{
+                value,
+                position: mass_pos.pos
+            };
+
+            mass_vec.push(cell);
+         }
+
+         let percentage_pos = CellRef {
+             pos: CellPosition {row: (ROW_OFFSET + ingredient_order.len()) as u32,
+             col: (2*col + COL_OFFSET) as u32},
+             fix_row: false,
+             fix_col: false,
+         };
+         
+         let mut mass_pos = percentage_pos.clone();
+         mass_pos.pos.col += 1;
+         
+         let value: CellValue;
+         if comp_name != MIX {
+             value = CellValue::Expr(CellExpr::BinaryOp(
+                                    BinOp::Div,
+                                    Box::new(CellExpr::Ref(percentage_pos)),
+                                    Box::new(component_masses[comp_name].clone())));
+         } else {
+             value = CellValue::Expr(CellExpr::Ref(percentage_pos));
+         }
+         let cell = CSVCell{
+             value,
+             position: mass_pos.pos
+         };
+         
+         mass_vec.push(cell);
+    }
+
+    mass_vec
 }
 
-// DFS on the component-ingredient graph
-//  - use to get the cell expressions that represents the actual
-//    proportion of each component.
-//  - must be called on the root (MIX)
+///  Obtain the cell expressions that represents the actual
+///  proportion of each component.
+///  - must be called on the root (MIX)
+///  - out parameter component_masses holds CellExpr assoiciated with
+///    each compnent
 fn component_mass_aux(
     current: &str,
     components: &HashMap<String, DoughComponent>,
@@ -292,23 +367,28 @@ fn component_mass_aux(
     on_path: &mut HashSet<String>,
 ) -> () {
 
-    // obtain expression for current and insert to component_masses
     if current != MIX {
         // obtain product of refs on stack
-        let mut expr_iter = ref_stack.iter();
-        let mut prod_expr = expr_iter.next().unwrap().clone();
+        let mut expr_iter: vec_deque::Iter<CellExpr> = ref_stack.iter();
+        let mut product_expr: CellExpr = expr_iter.next().unwrap().clone();
         for expr in expr_iter {
-            let next_expr = CellExpr::BinaryOp(BinOp::Mult, Box::new(expr.clone()), Box::new(prod_expr.clone()));
-            prod_expr = next_expr;
+            product_expr = CellExpr::BinaryOp(
+                BinOp::Mult,
+                Box::new(expr.clone()), 
+                Box::new(product_expr.clone())
+            );
         }
 
-        // if current component already visited => add prod_expr to previous expression
         if component_masses.contains_key(current) {
             let prev_expr: &CellExpr = &component_masses[current];
-            let next_expr: CellExpr = CellExpr::BinaryOp(BinOp::Add, Box::new(prev_expr.clone()), Box::new(prod_expr));
+            let next_expr: CellExpr = CellExpr::BinaryOp(
+                BinOp::Add,
+                Box::new(prev_expr.clone()),
+                Box::new(product_expr)
+            );
             component_masses.insert(current.to_string(), next_expr);
         } else {
-            component_masses.insert(current.to_string(), prod_expr);
+            component_masses.insert(current.to_string(), product_expr);
         }
     }
 
@@ -320,9 +400,10 @@ fn component_mass_aux(
     for (ing_name, _) in &component.ingredients {
         if components.contains_key(ing_name) {
             if on_path.contains(ing_name) {
-                panic!("Component may not be self referencing (directly or indirectly)");
+                panic!("Component graph must be acyclic");
             }
 
+            println!("CALL");
             let ing_percent_pos = component_percentages[current][ing_name]
                                                     .position
                                                     .clone();
@@ -335,19 +416,27 @@ fn component_mass_aux(
 
             let ing_ref = CellExpr::Ref(ing_percent_ref);
             ref_stack.push_front(ing_ref);
-            component_mass_aux(current, components, component_percentages, component_masses, ref_stack, visited, on_path);
+            component_mass_aux(&ing_name,
+                               components,
+                               component_percentages,
+                               component_masses,
+                               ref_stack,
+                               visited,
+                               on_path);
             ref_stack.pop_front();
         }
     }
+
     if current == MIX && components.len() != visited.len() {
-        panic!("mix must reference all components directly or indirectly");
+        panic!("Mix must reference all components directly or indirectly");
     }
+
     on_path.remove(current);
 }
 
-// DFS on the component-ingredient graph
-//  - will panic on finding cycle => invalid formula
-//  - will panic if it does not visit all components
+/// Validates the component-ingredient graph
+///  - will panic on finding cycle => invalid formula
+///  - will panic if it does not visit all components
 fn validate_structure(
     current: &str,
     components: &HashMap<String, DoughComponent>,
